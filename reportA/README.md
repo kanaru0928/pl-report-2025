@@ -57,7 +57,34 @@ class java.lang.Number
 
 ## [Goの総称型](https://doi.org/10.1145/3563331)
 
+Goの総称型は、構造体や関数を定義する際に型をパラメータとして取れることはJavaと同様である。ただし、Objectで置き換えるなどの型消去はせず、呼び出される可能性のある型パラメータ全てについて、その型に特化した関数を作成し置き換える。これをMonomorphisationという。
 
+これは、一度[monomorphic/main.go](./go/monomorphic/main.go)をビルドし、アセンブリに逆コンパイルすることで確認できる。
+
+```bash
+$ go build -gcflags="all=-N -l" -o main ./main.go
+$ go tool objdump -s "main\.Equal" main > main.s
+$ cat main.s
+TEXT main.Equal[go.shape.string](SB) /Users/kanaru/Documents/univ/univ2025/lp/pl-report-2025/reportA/go/monomorphic/main.go
+  ...
+
+TEXT main.Equal[go.shape.int](SB) /Users/kanaru/Documents/univ/univ2025/lp/pl-report-2025/reportA/go/monomorphic/main.go
+  ...
+```
+
+このように、型ごとに関数定義が2つできていることが確認できた。
+
+ただし実際には、メモリレイアウトが同じものを一つの関数にまとめるといった最適化が行われる。これは、上と同様に[memory_layout/main.go](./go/memory_layout/main.go)をビルドすることで確かめられる。
+
+```bash
+$ go build -gcflags="all=-N -l" -o main.out ./main.go
+$ go tool objdump -s "main\.Equal" main.out > main.s
+$ cat main.s
+TEXT main.GetValue[go.shape.*uint8](SB) /Users/kanaru/Documents/univ/univ2025/lp/pl-report-2025/reportA/go/memory_layout/main.go
+  ...
+```
+
+このように、メモリレイアウトが同じ構造体 `A` と `B` をパラメータに持つ総称型の関数が、一つの関数にまとめられた。
 
 ## Java vs. Go
 
