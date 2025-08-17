@@ -65,10 +65,10 @@ Goの総称型は、構造体や関数を定義する際に型をパラメータ
 $ go build -gcflags="all=-N -l" -o main ./main.go
 $ go tool objdump -s "main\.Equal" main > main.s
 $ cat main.s
-TEXT main.Equal[go.shape.string](SB) /Users/kanaru/Documents/univ/univ2025/lp/pl-report-2025/reportA/go/monomorphic/main.go
+TEXT main.Equal[go.shape.string](SB) /path/to/repository/reportA/go/monomorphic/main.go
   ...
 
-TEXT main.Equal[go.shape.int](SB) /Users/kanaru/Documents/univ/univ2025/lp/pl-report-2025/reportA/go/monomorphic/main.go
+TEXT main.Equal[go.shape.int](SB) /path/to/repository/reportA/go/monomorphic/main.go
   ...
 ```
 
@@ -88,8 +88,49 @@ TEXT main.GetValue[go.shape.*uint8](SB) /Users/kanaru/Documents/univ/univ2025/lp
 
 ## Java vs. Go
 
-* 具体例を示しつつJavaとGoの総称型を比較
-* 違いに対する評価も必要
+### 再帰的な総称型
+
+Monomorphisationの影響で、コンパイル時に型が確定しないような関数はGoで扱うことはできない。
+
+具体例として、Javaで[Recursive.java](./java/Recusive.java)を作成した。このプログラムのnestメソッドでは、指定した段数だけBoxをnestして、新しくインスタンスを作成する。しかし、これだとコンパイル時点ではどのようなパラメータのBoxクラスのインスタンスが作成されるかが確定しない。
+
+Javaにおいては型消去されるためどのような型であってもお構いなしに実行されるが、Goだと話が変わってくる。それを確かめるために、[recusive/main.go](./go/recusive/main.go)を作成した。これを実行すると、コンパイル時にエラーが発生する。
+
+```bash
+$ go run ./main.go
+# command-line-arguments
+./main.go:3:10: instantiation cycle:
+        ./main.go:9:14: T instantiated as Box[T]
+```
+
+このように、総称型を活用して再帰的な型を使いたいような場面で、Javaは型消去の柔軟性を発揮できるが、Goでは制約がかかってしまう。
+
+実際に、再帰的なジェネリクスを使いたい場面として、Rustのtypenum traitの例がある。このtraitで実装されている256ビット符号なし整数 `U256` の定義は次のとおり。
+
+```rust
+pub type U256 = UInt<UInt<UInt<UInt<UInt<UInt<UInt<UInt<UInt<UTerm, B1>, B0>, B0>, B0>, B0>, B0>, B0>, B0>, B0>;
+```
+
+このようなことをやろうとすると、Goでは厳しいと思われる。
+
+### 複雑なデザインパターンの場合
+
+次のようなビルダーパターンのプログラムを考える。
+
+![ビルダーパターンのクラス図](./class_diagram.drawio.svg)
+
+Javaの場合は[ExtendedBuilder.java](./java/ExtendedBuilder.java)のように素直に実装できる。
+
+一方、GoではJavaのような柔軟な総称型が使用できず、無理やり実装すると機能が制限されてしまう。[builder/main.go](./go/builder/main.go)では、103行目で `Price()` 関数が本来であれば `BookBuilder` を返して欲しいのに、`ProductBuilder` を返してしまい、エラーが発生した。
+
+このように、Javaのようなクラスシステムを持つ言語によるOOPでの実装を前提としたデザインパターンをGoで実装すると、不自由な点が生じる。
+
+### オーバーロード
+
+Javaにはオーバーロードという、引数の型によって同じ名前の関数でも別のものとして扱える仕様がある。しかし、このオーバーロードは[Overload.java](./java/Overload.java)のような場合には正常に機能しない。型消去後に `List<Integer>` と `List<String>` を区別できないためである。
+
+一方、Goでは総称型をうまく使うことで[overload/main.go](./go/overload/main.go)のように同様の機能が実装できる。
 
 ## 参考文献
 
+1. <https://docs.rs/typenum/1.18.0/typenum/consts/type.U256.html>
